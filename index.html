@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Penalty Shootout</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      min-height: 100vh;
+      display: flex;
+      color: white;
+      overflow-x: hidden;
+    }
+
+    .sidebar {
+      width: 200px;
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      backdrop-filter: blur(10px);
+      min-height: 100vh;
+    }
+
+    .logo { text-align: center; font-size: 2rem; margin-bottom: 10px; }
+
+    .score-panel {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+    }
+
+    .score-panel h3 { font-size: 0.85rem; margin-bottom: 8px; opacity: 0.9; }
+    .score-display { font-size: 2.5rem; font-weight: bold; margin: 8px 0; }
+
+    .human-score { background: linear-gradient(135deg, #7983ad 0%, #726380 100%); border: 2px solid #fff; }
+    .ai-score { background: linear-gradient(135deg, #0fbfa5 0%, #073d3e 100%); border: 2px solid #fff; }
+
+    .round-display {
+      background: rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: bold;
+    }
+
+    .mode-toggle {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .mode-toggle input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+    .game-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 15px;
+    }
+
+    .game-container {
+      background: white;
+      border-radius: 15px;
+      padding: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 520px;
+      color: #333;
+    }
+
+    .timer-bar { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; margin-bottom: 8px; overflow: hidden; }
+    .timer-fill { height: 100%; background: linear-gradient(90deg, #11998e, #38ef7d); transition: width 0.1s linear; border-radius: 4px; }
+    .timer-fill.warning { background: linear-gradient(90deg, #f093fb, #f5576c); }
+    .timer-text { text-align: center; font-size: 0.9rem; font-weight: bold; margin-bottom: 8px; color: #333; }
+
+    .field {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      background: linear-gradient(to bottom, #2d5a27 0%, #3d7a37 100%);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      border: 3px solid #fff;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
+    }
+
+    .goal {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 95px;
+      height: 75px;
+      border: 3px solid white;
+      border-right: none;
+      background: repeating-linear-gradient(0deg, transparent, transparent 12px, rgba(255,255,255,0.3) 12px, rgba(255,255,255,0.3) 13px);
+    }
+
+    .goal-zone {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 85px;
+      height: 65px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+      gap: 4px;
+      padding: 6px;
+    }
+
+    .zone {
+      border: 1.5px dashed rgba(255,255,255,0.6);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .zone:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }
+    .zone.selected { background: rgba(255,215,0,0.7); border-color: #ffd700; box-shadow: 0 0 8px rgba(255,215,0,0.8); }
+
+    .ball {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      background: radial-gradient(circle at 30% 30%, #fff, #ddd);
+      border-radius: 50%;
+      left: 35px;
+      top: 50%;
+      transform: translateY(-50%);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 10;
+    }
+
+    .goalkeeper {
+      position: absolute;
+      right: 85px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      border-radius: 50%;
+      border: 2px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      transition: all 0.3s;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    }
+
+    .status {
+      text-align: center;
+      font-size: 0.95rem;
+      font-weight: bold;
+      margin: 8px 0;
+      padding: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 6px;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .controls { display: flex; flex-direction: column; gap: 10px; }
+    .direction-buttons { display: flex; gap: 8px; justify-content: center; }
+    
+    .dir-btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      color: white;
+    }
+
+    .dir-btn.left { background: linear-gradient(135deg, #667eea 0%, #0b7cd8b7 100%); }
+    .dir-btn.center { background: linear-gradient(135deg, #848694 0%, #04439b 100%); }
+    .dir-btn.right { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .dir-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+    .dir-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .dir-btn.active { box-shadow: 0 0 0 3px rgba(255,255,255,0.8); transform: scale(1.03); }
+
+    .action-buttons { display: flex; gap: 8px; justify-content: center; }
+    .shoot-btn { flex: 2; padding: 12px; font-size: 1rem; font-weight: bold; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+    .shoot-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+    .shoot-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .reset-btn { flex: 1; padding: 12px; font-size: 0.9rem; font-weight: bold; background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%); color: white; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center; }
+    .modal.show { display: flex; }
+    .modal-content { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 90%; animation: slideIn 0.3s ease-out; }
+    @keyframes slideIn { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-content h2 { font-size: 1.8rem; margin-bottom: 12px; }
+    .modal-content p { font-size: 1rem; margin-bottom: 20px; }
+    .modal-btn { padding: 10px 30px; font-size: 1rem; background: white; color: #667eea; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+    .modal-btn:hover { transform: scale(1.05); }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; min-height: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; padding: 10px; }
+      .logo { display: none; }
+      .score-panel { flex: 1; min-width: 100px; padding: 8px; }
+      .score-display { font-size: 1.8rem; }
+      .round-display { display: none; }
+      .mode-toggle { margin-top: 8px; width: 100%; justify-content: center; }
+      .field { height: 180px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo">⚽</div>
+    <div class="score-panel human-score">
+      <h3>👤 YOU</h3>
+      <div class="score-display" id="humanScore">0</div>
+    </div>
+    <div class="score-panel ai-score">
+      <h3>🤖 AI</h3>
+      <div class="score-display" id="aiScore">0</div>
+    </div>
+    <div class="round-display">Round <span id="roundNum">1</span></div>
+    <div class="mode-toggle">
+      <input type="checkbox" id="autoPlay" checked>
+      <label for="autoPlay">🤖 AI Auto-Play</label>
+    </div>
+  </div>
+
+  <div class="game-area">
+    <div class="game-container">
+      <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+      <div class="timer-text" id="timerText">Time: 20s</div>
+      
+      <div class="field">
+        <div class="goal">
+          <div class="goal-zone" id="goalZone">
+            <div class="zone" data-pos="top-left">↖</div>
+            <div class="zone" data-pos="top-center">↑</div>
+            <div class="zone" data-pos="top-right">↗</div>
+            <div class="zone" data-pos="mid-left">←</div>
+            <div class="zone" data-pos="mid-center">●</div>
+            <div class="zone" data-pos="mid-right">→</div>
+            <div class="zone" data-pos="bottom-left">↙</div>
+            <div class="zone" data-pos="bottom-center">↓</div>
+            <div class="zone" data-pos="bottom-right">↘</div>
+          </div>
+        </div>
+        <div class="ball" id="ball">⚽</div>
+        <div class="goalkeeper" id="goalkeeper">🧤</div>
+      </div>
+
+      <div class="status" id="status">Select direction & shoot!</div>
+
+      <div class="controls">
+        <div class="direction-buttons">
+          <button class="dir-btn left" onclick="selectDirection('left')" id="btnLeft">⬅️ Left</button>
+          <button class="dir-btn center" onclick="selectDirection('center')" id="btnCenter">⬆️ Center</button>
+          <button class="dir-btn right" onclick="selectDirection('right')" id="btnRight">➡️ Right</button>
+        </div>
+        <div class="action-buttons">
+          <button class="shoot-btn" onclick="shoot()" id="shootBtn">⚽ SHOOT!</button>
+          <button class="reset-btn" onclick="resetGame()">🔄 Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="goalModal">
+    <div class="modal-content">
+      <h2 id="goalText">GOAL! ⚽</h2>
+      <p id="goalSubtext">Amazing shot!</p>
+      <button class="modal-btn" onclick="continueGame()">Continue</button>
+    </div>
+  </div>
+
+  <div class="modal" id="winModal">
+    <div class="modal-content">
+      <h2 id="winText">🏆 You Win!</h2>
+      <p id="finalScore">Final: 3 - 1</p>
+      <button class="modal-btn" onclick="resetGame()">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    let humanScore = 0; let aiScore = 0; let round = 1; let isHumanTurn = true;
+    let selectedDirection = null; let gameEnded = false; let isAutoPlay = true;
+    let timer = null; let timeLeft = 20; const TIME_LIMIT = 20;
+
+    const directions = {
+      'left': { x: -25, y: -10, zone: 'mid-left' },
+      'center': { x: 0, y: -15, zone: 'mid-center' },
+      'right': { x: 25, y: 10, zone: 'mid-right' }
+    };
+
+    function startTimer() {
+      clearInterval(timer); timeLeft = TIME_LIMIT; updateTimerDisplay();
+      timer = setInterval(() => {
+        timeLeft--; updateTimerDisplay();
+        if (timeLeft <= 0) { clearInterval(timer); timeOut(); }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const percentage = (timeLeft / TIME_LIMIT) * 100;
+      document.getElementById('timerFill').style.width = percentage + '%';
+      document.getElementById('timerText').textContent = `Time: ${timeLeft}s`;
+      document.getElementById('timerFill').classList.toggle('warning', timeLeft <= 5);
+    }
+
+    function timeOut() {
+      updateStatus(isHumanTurn ? '⏰ Time\'s up! You missed!' : '⏰ AI time out!');
+      setTimeout(() => showModal(isHumanTurn ? 'TIME OUT! ⏰' : 'AI TIME OUT! ⏰', isHumanTurn ? 'You ran out of time!' : 'AI ran out of time!'), 400);
+    }
+
+    function selectDirection(dir) {
+      if (!isHumanTurn || gameEnded) return;
+      selectedDirection = dir;
+      document.querySelectorAll('.dir-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('btn' + dir.charAt(0).toUpperCase() + dir.slice(1)).classList.add('active');
+      document.querySelectorAll('.zone').forEach(z => z.classList.remove('selected'));
+      const zoneMap = { left: 'mid-left', center: 'mid-center', right: 'mid-right' };
+      const sel = document.querySelector(`[data-pos="${zoneMap[dir]}"]`);
+      if (sel) sel.classList.add('selected');
+      updateStatus(`Selected: ${dir.toUpperCase()}! Shoot now!`);
+    }
+
+    function shoot() {
+      if (gameEnded) return;
+      clearInterval(timer);
+      if (isHumanTurn) {
+        if (!selectedDirection) { updateStatus('⚠️ Select direction first!'); startTimer(); return; }
+        humanShoot();
+      } else { aiShoot(); }
+    }
+
+    function humanShoot() {
+      const ball = document.getElementById('ball');
+      const gk = document.getElementById('goalkeeper');
+      const dir = directions[selectedDirection];
+      
+      ball.style.left = `calc(100% - 105px + ${dir.x}px)`;
+      ball.style.top = `calc(50% + ${dir.y}px)`;
+      
+      const dives = [-25, 0, 25];
+      const dive = dives[Math.floor(Math.random() * dives.length)];
+      gk.style.transform = `translateY(-50%) translateX(${dive}px)`;
+      
+      setTimeout(() => {
+        const saved = Math.abs(dive - dir.x) < 18 && Math.random() > 0.4;
+        if (saved) showModal('SAVED! 🧤', 'Goalkeeper stopped it!');
+        else { humanScore++; document.getElementById('humanScore').textContent = humanScore; showModal('GOAL! ⚽', 'Amazing shot!'); }
+        checkWinner();
+      }, 400);
+    }
+
+    function aiShoot() {
+      setTimeout(() => {
+        const ball = document.getElementById('ball');
+        const gk = document.getElementById('goalkeeper');
+        const dirs = ['left', 'center', 'right'];
+        const choice = dirs[Math.floor(Math.random() * dirs.length)];
+        const dir = directions[choice];
+        
+        updateStatus('🤖 AI shooting...');
+        ball.style.left = `calc(100% - 105px + ${dir.x}px)`;
+        ball.style.top = `calc(50% + ${dir.y}px)`;
+        
+        const saves = [-25, 0, 25];
+        const playerSave = saves[Math.floor(Math.random() * saves.length)];
+        gk.style.transform = `translateY(-50%) translateX(${playerSave}px)`;
+        
+        setTimeout(() => {
+          const saved = Math.abs(playerSave - dir.x) < 18 && Math.random() > 0.35;
+          if (saved) showModal('YOU SAVED! 🙌', 'Great reflexes!');
+          else { aiScore++; document.getElementById('aiScore').textContent = aiScore; showModal('AI SCORES! ⚽', 'AI found the net!'); }
+          checkWinner();
+        }, 400);
+      }, 1000);
+    }
+
+    function showModal(title, subtitle) {
+      document.getElementById('goalText').textContent = title;
+      document.getElementById('goalSubtext').textContent = subtitle;
+      document.getElementById('goalModal').classList.add('show');
+    }
+
+    function continueGame() {
+      document.getElementById('goalModal').classList.remove('show');
+      nextRound();
+    }
+
+    function nextRound() {
+      if (gameEnded) return;
+      round++; document.getElementById('roundNum').textContent = round;
+      resetPositions();
+      isHumanTurn = !isHumanTurn; selectedDirection = null;
+      document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.zone').forEach(z => z.classList.remove('selected'));
+      if (isHumanTurn) {
+        updateStatus('Your turn! You have 20 seconds.');
+        document.getElementById('shootBtn').disabled = false; startTimer();
+      } else {
+        updateStatus("AI's turn...");
+        document.getElementById('shootBtn').disabled = true;
+        if (isAutoPlay) { startTimer(); setTimeout(() => aiShoot(), 1200); } else { startTimer(); }
+      }
+    }
+
+    function resetPositions() {
+      document.getElementById('ball').style.left = '35px';
+      document.getElementById('ball').style.top = '50%';
+      document.getElementById('goalkeeper').style.transform = 'translateY(-50%) translateX(0)';
+    }
+
+    function checkWinner() {
+      if (humanScore >= 3 || aiScore >= 3) {
+        endGame();
+      }
+    }
+
+    function endGame() {
+      gameEnded = true; clearInterval(timer);
+      let title, sub;
+      if (humanScore >= 3) { title = '🏆 You Win!'; sub = `Final Score: ${humanScore} - ${aiScore}`; }
+      else if (aiScore >= 3) { title = '🤖 AI Wins!'; sub = `Final Score: ${humanScore} - ${aiScore}`; }
+      else { title = "🤝 It's a Draw!"; sub = `Final Score: ${humanScore} - ${aiScore}`; }
+      document.getElementById('winText').textContent = title;
+      document.getElementById('finalScore').textContent = sub;
+      document.getElementById('winModal').classList.add('show');
+    }
+
+    function resetGame() {
+      humanScore = 0; aiScore = 0; round = 1; isHumanTurn = true; selectedDirection = null; gameEnded = false;
+      document.getElementById('humanScore').textContent = '0'; document.getElementById('aiScore').textContent = '0';
+      document.getElementById('roundNum').textContent = '1';
+      document.getElementById('goalModal').classList.remove('show'); document.getElementById('winModal').classList.remove('show');
+      clearInterval(timer); resetPositions();
+      document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.zone').forEach(z => z.classList.remove('selected'));
+      document.getElementById('shootBtn').disabled = false;
+      updateStatus('New game! First to 3 goals wins.'); startTimer();
+    }
+
+    function updateStatus(msg) { document.getElementById('status').textContent = msg; }
+    document.getElementById('autoPlay').addEventListener('change', e => isAutoPlay = e.target.checked);
+    updateStatus('New game! First to 3 goals wins.'); startTimer();
+  </script>
+</body>
+</html>
